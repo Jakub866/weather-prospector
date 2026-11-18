@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Weather Prospector</title>
+    <meta name="description" content="Statystyki pogody z ostatnich N lat i klimatologiczna prognoza dla dowolnego miejsca na mapie." />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛅</text></svg>" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>⛅ Weather Prospector</h1>
+      <p class="subtitle">Jaka pogoda była tu najczęściej — i czego statystycznie się spodziewać.</p>
+    </header>
+
+    <main class="layout">
+      <section class="panel controls">
+        <form id="form" autocomplete="off">
+          <label class="field search">
+            <span>Miejsce</span>
+            <input id="search" type="search" placeholder="Szukaj miasta… albo kliknij na mapie" />
+            <ul id="suggestions" class="suggestions" hidden></ul>
+          </label>
+          <div id="map" class="map" aria-label="Mapa – kliknij, aby wybrać lokalizację"></div>
+          <p class="location" id="location"></p>
+
+          <div class="grid3">
+            <label class="field">
+              <span>Data odniesienia</span>
+              <input id="date" type="date" required />
+            </label>
+            <label class="field">
+              <span>N – lat historii</span>
+              <input id="years" type="number" min="1" max="50" value="30" required />
+            </label>
+            <label class="field">
+              <span>M – dni w przód</span>
+              <input id="ahead" type="number" min="0" max="365" value="7" required />
+            </label>
+          </div>
+          <p class="target">Data docelowa: <strong id="target-date">—</strong></p>
+          <button id="submit" type="submit">Analizuj</button>
+        </form>
+      </section>
+
+      <section class="panel results" id="results" aria-live="polite">
+        <div class="empty" id="empty">
+          <p>Wybierz miejsce na mapie, ustaw datę, liczbę lat (N) i horyzont (M), a potem kliknij <strong>Analizuj</strong>.</p>
+        </div>
+        <div id="status" class="status" hidden></div>
+        <div id="output" hidden>
+          <h2 id="out-title"></h2>
+          <p class="meta" id="out-meta"></p>
+
+          <h3>Prognoza klimatologiczna</h3>
+          <div class="tiles" id="forecast-tiles"></div>
+
+          <h3>Co było najczęściej (historia)</h3>
+          <div class="tiles" id="history-tiles"></div>
+
+          <div class="charts">
+            <figure class="chart-card">
+              <figcaption>Rozkład temperatur dziennych w oknie ±7 dni</figcaption>
+              <div class="chart-box"><canvas id="chart-hist"></canvas></div>
+            </figure>
+            <figure class="chart-card">
+              <figcaption>Średnia temperatura okna rok po roku</figcaption>
+              <div class="chart-box"><canvas id="chart-trend"></canvas></div>
+            </figure>
+            <figure class="chart-card">
+              <figcaption>Prawdopodobieństwo typu pogody (nowsze lata ważone mocniej)</figcaption>
+              <div class="chart-box short"><canvas id="chart-cats"></canvas></div>
+            </figure>
+          </div>
+
+          <p class="disclaimer">
+            To estymacja statystyczna oparta na danych historycznych (ERA5 przez Open-Meteo), a nie prognoza
+            meteorologiczna. Uwzględnia trend liniowy z ostatnich N lat i mocniej waży nowsze lata (okres półtrwania 10 lat).
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      Dane: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (ERA5) ·
+      Mapa: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
