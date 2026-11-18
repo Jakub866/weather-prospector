@@ -47,7 +47,7 @@ Każdy push na `main` buduje i publikuje aplikację na GitHub Pages (`.github/wo
 
 | Plik | Rola |
 |---|---|
-| `src/api.ts` | pobieranie archiwum i geokodowanie, cache w `sessionStorage` |
+| `src/api.ts` | pobieranie archiwum i geokodowanie, cache w `localStorage` |
 | `src/stats.ts` | okno sezonowe, moda, kwantyle, regresja, prognoza (czyste funkcje) |
 | `src/weatherCodes.ts` | kody WMO → kategorie pogody |
 | `src/map.ts` | mapa Leaflet |

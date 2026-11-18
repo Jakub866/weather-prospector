@@ -27,12 +27,8 @@ export async function fetchHistory(lat: number, lon: number, years: number): Pro
   start.setUTCDate(start.getUTCDate() - 10); // zapas na okno ±7 dni na początku zakresu
 
   const key = `wp:${lat.toFixed(2)}:${lon.toFixed(2)}:${isoDate(start)}:${isoDate(end)}`;
-  try {
-    const cached = sessionStorage.getItem(key);
-    if (cached) return JSON.parse(cached) as DailyRecord[];
-  } catch {
-    /* brak dostępu do storage – pomijamy cache */
-  }
+  const cached = readCache(key);
+  if (cached) return cached;
 
   const params = new URLSearchParams({
     latitude: lat.toFixed(4),
@@ -51,6 +47,9 @@ export async function fetchHistory(lat: number, lon: number, years: number): Pro
   });
 
   const res = await fetch(`${ARCHIVE_URL}?${params}`);
+  if (res.status === 429) {
+    throw new Error('Przekroczono limit zapytań darmowego API Open-Meteo. Odczekaj minutę i spróbuj ponownie.');
+  }
   if (!res.ok) {
     let reason = `${res.status} ${res.statusText}`;
     try {
@@ -79,12 +78,52 @@ export async function fetchHistory(lat: number, lon: number, years: number): Pro
     });
   }
 
-  try {
-    sessionStorage.setItem(key, JSON.stringify(out));
-  } catch {
-    /* np. przekroczony limit – trudno */
-  }
+  writeCache(key, out);
   return out;
+}
+
+// ---------- cache w localStorage (format kolumnowy, by zmieścić się w limicie) ----------
+const FIELDS = ['tMax', 'tMin', 'tMean', 'precip', 'code', 'wind'] as const;
+const CACHE_PREFIX = 'wp1:';
+
+function readCache(key: string): DailyRecord[] | null {
+  try {
+    const raw = localStorage.getItem(CACHE_PREFIX + key);
+    if (!raw) return null;
+    const c = JSON.parse(raw) as { start: string; dates: number[]; cols: number[][] };
+    const t0 = new Date(`${c.start}T00:00:00Z`).getTime();
+    return c.dates.map((dd, i) => {
+      const r: any = { date: isoDate(new Date(t0 + dd * 86_400_000)) };
+      FIELDS.forEach((f, j) => (r[f] = c.cols[j][i]));
+      return r as DailyRecord;
+    });
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(key: string, rows: DailyRecord[]): void {
+  if (rows.length === 0) return;
+  const start = rows[0].date;
+  const t0 = new Date(`${start}T00:00:00Z`).getTime();
+  const payload = JSON.stringify({
+    start,
+    dates: rows.map((r) => Math.round((new Date(`${r.date}T00:00:00Z`).getTime() - t0) / 86_400_000)),
+    cols: FIELDS.map((f) => rows.map((r) => r[f])),
+  });
+  try {
+    localStorage.setItem(CACHE_PREFIX + key, payload);
+  } catch {
+    // brak miejsca – usuń stare wpisy i spróbuj raz jeszcze
+    try {
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith(CACHE_PREFIX))
+        .forEach((k) => localStorage.removeItem(k));
+      localStorage.setItem(CACHE_PREFIX + key, payload);
+    } catch {
+      /* cache niedostępny – trudno */
+    }
+  }
 }
 
 export interface Place {

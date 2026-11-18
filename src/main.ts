@@ -3,7 +3,7 @@ import { fetchHistory, isoDate, searchPlaces, type Place } from './api';
 import { renderCharts } from './charts';
 import { createMap } from './map';
 import { analyze, type Analysis, type TempForecast } from './stats';
-import { CATEGORIES } from './weatherCodes';
+import { CATEGORIES, categorize } from './weatherCodes';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -23,6 +23,7 @@ const suggestions = $<HTMLUListElement>('suggestions');
 const fmtDate = new Intl.DateTimeFormat('pl-PL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 const fmtDay = new Intl.DateTimeFormat('pl-PL', { day: 'numeric', month: 'long', timeZone: 'UTC' });
 const t = (x: number) => `${x.toFixed(1)}°C`;
+const deg = (x: number) => `${Math.round(x)}°C`;
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
 dateInput.value = isoDate(new Date());
@@ -159,6 +160,8 @@ function render(a: Analysis, years: number, ahead: number) {
     (a.forecast.extrapolationYears > 0 ? ` · ekstrapolacja ${a.forecast.extrapolationYears} lat poza dane` : '') +
     (a.years.length < years ? ` · dostępne ${a.years.length} z ${years} lat` : '');
 
+  renderStory(a);
+
   const f = a.forecast;
   const top = f.categories[0];
   const second = f.categories[1];
@@ -204,6 +207,65 @@ function render(a: Analysis, years: number, ahead: number) {
   renderCharts(a);
 }
 
+const esc = (x: string) => x.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+const row = (label: string, value: string) => `<div class="row"><span>${label}</span><strong>${value}</strong></div>`;
+const cat = (code: number) => {
+  const c = CATEGORIES[categorize(code)];
+  return `${c.icon} ${c.label}`;
+};
+const inTen = (p: number) => `${Math.round(p * 10)} na 10 dni`;
+const dayDot = '<i class="dot day"></i>W dzień';
+const nightDot = '<i class="dot night"></i>W nocy';
+
+function renderStory(a: Analysis) {
+  const h = a.historical;
+  const f = a.forecast;
+  const y0 = a.years[0];
+  const y1 = a.years[a.years.length - 1];
+  const targetYear = a.target.getUTCFullYear();
+  const dayName = fmtDay.format(a.target);
+  const latest = [...a.exactDays].reverse().find((d) => d.date < isoDate(a.target));
+  const hTop = CATEGORIES[h.categories[0].category];
+  const fTop = CATEGORIES[f.categories[0].category];
+
+  const cards = [
+    `<div class="card"><div class="when">Było</div><div class="sub">średnio ${y0}–${y1}, okolice ${esc(dayName)}</div>
+      ${row(dayDot, deg(h.tMaxMean))}
+      ${row(nightDot, deg(h.tMinMean))}
+      ${row('Najczęściej', `${hTop.icon} ${hTop.label}`)}
+      ${row('Opad', inTen(h.rainProbability))}</div>`,
+  ];
+  if (latest) {
+    cards.push(
+      `<div class="card"><div class="when">Ostatnio</div><div class="sub">${esc(fmtDate.format(new Date(`${latest.date}T00:00:00Z`)))}</div>
+        ${row(dayDot, deg(latest.tMax))}
+        ${row(nightDot, deg(latest.tMin))}
+        ${row('Pogoda', cat(latest.code))}
+        ${row('Opad', latest.precip >= 0.1 ? `${latest.precip.toFixed(1)} mm` : 'brak')}</div>`,
+    );
+  }
+  const rng = (fc: TempForecast) => `~${deg(fc.expected)} <span class="range">(${deg(fc.p10)}…${deg(fc.p90)})</span>`;
+  cards.push(
+    `<div class="card future"><div class="when">Będzie (prognoza)</div><div class="sub">${esc(fmtDate.format(a.target))}</div>
+      ${row(dayDot, rng(f.tMax))}
+      ${row(nightDot, rng(f.tMin))}
+      ${row('Najpewniej', `${fTop.icon} ${fTop.label} (${pct(f.categories[0].share)})`)}
+      ${row('Szansa opadu', pct(f.rainProbability))}</div>`,
+  );
+  $('story').innerHTML = cards.join('');
+
+  const diff = f.tMax.expected - h.tMaxMean;
+  const diffText =
+    Math.abs(diff) < 0.5
+      ? 'mniej więcej tyle samo co zwykle'
+      : `o ${Math.abs(diff).toFixed(1)}°C ${diff > 0 ? 'cieplej' : 'chłodniej'} niż średnio dotąd`;
+  $('summary').innerHTML =
+    `W latach ${y0}–${y1} około ${esc(dayName)} było zwykle <strong>${deg(h.tMaxMean)} w dzień</strong> i ` +
+    `<strong>${deg(h.tMinMean)} w nocy</strong>, najczęściej ${esc(hTop.label.toLowerCase())}. ` +
+    `W ${targetYear} r. spodziewaj się ok. <strong>${deg(f.tMax.expected)} w dzień</strong> (${diffText}), ` +
+    `najpewniej ${esc(fTop.label.toLowerCase())}; szansa opadu ${pct(f.rainProbability)}.`;
+}
+
 function showStatus(msg: string, error = false) {
   $('empty').hidden = true;
   const s = $('status');
@@ -229,6 +291,7 @@ form.addEventListener('submit', async (e) => {
     const records = await fetchHistory(state.lat, state.lon, years);
     const analysis = analyze(records, target);
     last = { a: analysis, years, ahead };
+    saveToUrl(years);
     render(analysis, years, ahead);
   } catch (err) {
     $('output').hidden = true;
@@ -242,3 +305,40 @@ form.addEventListener('submit', async (e) => {
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
   if (last) render(last.a, last.years, last.ahead);
 });
+
+// ---------- stan w adresie URL (link do konkretnego wyniku) ----------
+function saveToUrl(years: number) {
+  const p = new URLSearchParams({
+    lat: state.lat.toFixed(4),
+    lon: state.lon.toFixed(4),
+    place: state.label,
+    date: dateInput.value,
+    target: targetInput.value,
+    years: String(years),
+  });
+  history.replaceState(null, '', `?${p}`);
+}
+
+function loadFromUrl() {
+  const p = new URLSearchParams(location.search);
+  const lat = Number(p.get('lat'));
+  const lon = Number(p.get('lon'));
+  if (!p.has('lat') || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+  state.lat = lat;
+  state.lon = lon;
+  state.label = p.get('place') || 'Wybrany punkt';
+  map.setLocation(lat, lon, state.label, true);
+  updateLocation();
+  const isDate = (v: string | null) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  if (isDate(p.get('date'))) dateInput.value = p.get('date')!;
+  if (p.get('years')) yearsInput.value = p.get('years')!;
+  if (isDate(p.get('target'))) {
+    targetInput.value = p.get('target')!;
+    syncAheadFromTarget();
+  } else {
+    syncTargetFromAhead();
+  }
+  form.requestSubmit();
+}
+
+loadFromUrl();

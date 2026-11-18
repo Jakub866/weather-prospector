@@ -56,26 +56,34 @@
           <h2 id="out-title"></h2>
           <p class="meta" id="out-meta"></p>
 
-          <h3>Prognoza klimatologiczna</h3>
-          <div class="tiles" id="forecast-tiles"></div>
-
-          <h3>Co było najczęściej (historia)</h3>
-          <div class="tiles" id="history-tiles"></div>
+          <p class="summary" id="summary"></p>
+          <div class="story" id="story"></div>
 
           <div class="charts">
+            <figure class="chart-card wide">
+              <figcaption id="cap-timeline"></figcaption>
+              <p class="how">Kropki = faktyczna temperatura tego dnia w danym roku. Romb = prognoza, jasny pasek = prawdopodobny zakres (8 na 10 przypadków), linia przerywana = kierunek zmian.</p>
+              <div class="chart-box tall"><canvas id="chart-timeline"></canvas></div>
+            </figure>
             <figure class="chart-card">
-              <figcaption>Rozkład temperatur dziennych w oknie ±7 dni</figcaption>
+              <figcaption id="cap-hist"></figcaption>
+              <p class="how">Jak często w tym okresie roku (±7 dni) była dana temperatura w dzień.</p>
               <div class="chart-box"><canvas id="chart-hist"></canvas></div>
             </figure>
             <figure class="chart-card">
-              <figcaption>Średnia temperatura okna rok po roku</figcaption>
-              <div class="chart-box"><canvas id="chart-trend"></canvas></div>
-            </figure>
-            <figure class="chart-card">
-              <figcaption>Prawdopodobieństwo typu pogody (nowsze lata ważone mocniej)</figcaption>
-              <div class="chart-box short"><canvas id="chart-cats"></canvas></div>
+              <figcaption id="cap-cats"></figcaption>
+              <p class="how">Szary = jak często było, niebieski = szansa w dniu docelowym.</p>
+              <div class="chart-box"><canvas id="chart-cats"></canvas></div>
             </figure>
           </div>
+
+          <details class="details">
+            <summary>Szczegóły statystyczne</summary>
+            <h3>Prognoza</h3>
+            <div class="tiles" id="forecast-tiles"></div>
+            <h3>Historia (±7 dni wokół daty)</h3>
+            <div class="tiles" id="history-tiles"></div>
+          </details>
 
           <p class="disclaimer">
             To estymacja statystyczna oparta na danych historycznych (ERA5 przez Open-Meteo), a nie prognoza

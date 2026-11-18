@@ -88,7 +88,7 @@ a {
 }
 @media (max-width: 900px) {
   .layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -178,12 +178,12 @@ a {
 
 .grid3 {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 @media (max-width: 420px) {
   .grid3 {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
   .grid3 .field:first-child {
     grid-column: 1 / -1;
@@ -281,7 +281,7 @@ button:disabled {
 }
 @media (max-width: 1100px) {
   .charts {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 .chart-card {
@@ -291,8 +291,98 @@ button:disabled {
   padding: 12px;
   min-width: 0;
 }
-.chart-card:last-child {
+.chart-card.wide {
   grid-column: 1 / -1;
+}
+.chart-box.tall {
+  height: 340px;
+}
+.how {
+  margin: -4px 0 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.summary {
+  font-size: 1.05rem;
+  margin: 16px 0 12px;
+  line-height: 1.55;
+}
+.story {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+@media (max-width: 700px) {
+  .story {
+    grid-template-columns: 1fr;
+  }
+}
+.card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.card.future {
+  border-color: var(--accent);
+  border-width: 2px;
+}
+.card .when {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.card .sub {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.card .row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+  font-variant-numeric: tabular-nums;
+}
+.card .row span:first-child {
+  color: var(--text-secondary);
+}
+.card .row strong {
+  text-align: right;
+}
+.card .range {
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.dot.day {
+  background: var(--series-2);
+}
+.dot.night {
+  background: var(--series-1);
+}
+
+.details {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.details summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding: 6px 0;
 }
 .chart-card figcaption {
   font-size: 0.85rem;

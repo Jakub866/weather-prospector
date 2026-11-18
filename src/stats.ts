@@ -202,6 +202,8 @@ export interface Analysis {
     tMinMode: Bin | null;
     tMax: number[];
     tMin: number[];
+    tMaxMean: number;
+    tMinMean: number;
     categories: CategoryShare[];
     rainProbability: number;
     medianWetPrecip: number;
@@ -221,6 +223,10 @@ export interface Analysis {
   };
   yearly: YearPoint[];
   trendLine: YearPoint[];
+  /** Faktyczne wartości dokładnie tego dnia kalendarzowego w kolejnych latach. */
+  exactDays: (DailyRecord & { year: number })[];
+  /** Linie trendu (od pierwszego roku danych do roku docelowego) dla temp. max i min. */
+  trends: { tMax: YearPoint[]; tMin: YearPoint[] };
 }
 
 export interface AnalyzeOptions {
@@ -326,6 +332,19 @@ export function analyze(records: DailyRecord[], target: Date, opts: AnalyzeOptio
   const wSum = weights.reduce((a, b) => a + b, 0);
   const wWet = samples.reduce((a, s, i) => a + (s.precip >= wet ? weights[i] : 0), 0);
 
+  const endYear = Math.max(targetYear, latest);
+  const line = (reg: Regression): YearPoint[] =>
+    useTrend
+      ? [
+          { year: years[0], mean: reg.predict(years[0]) },
+          { year: endYear, mean: reg.predict(endYear) },
+        ]
+      : [];
+  const exactDays = samples
+    .filter((s) => s.offset === 0)
+    .map((s) => ({ ...s, year: s.seasonYear }))
+    .sort((a, b) => a.year - b.year);
+
   const trendLine = useTrend
     ? [
         { year: years[0], mean: fMean.reg.predict(years[0]) },
@@ -349,6 +368,8 @@ export function analyze(records: DailyRecord[], target: Date, opts: AnalyzeOptio
       tMinMode: modeBin(tMin, 1),
       tMax,
       tMin,
+      tMaxMean: mean(tMax),
+      tMinMean: mean(tMin),
       categories: categoryShares(samples, ones),
       rainProbability: wetSamples.length / samples.length,
       medianWetPrecip: quantile(
@@ -370,5 +391,7 @@ export function analyze(records: DailyRecord[], target: Date, opts: AnalyzeOptio
     },
     yearly: fMean.yearly,
     trendLine,
+    exactDays,
+    trends: { tMax: line(fMax.reg), tMin: line(fMin.reg) },
   };
 }
