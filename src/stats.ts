@@ -91,6 +91,8 @@ export interface Regression {
   intercept: number;
   r2: number;
   predict(x: number): number;
+  /** Błąd standardowy linii trendu w punkcie x – rośnie z odległością od środka danych. */
+  standardError(x: number): number;
 }
 
 /** Regresja liniowa metodą najmniejszych kwadratów. */
@@ -109,7 +111,16 @@ export function linearRegression(xs: number[], ys: number[]): Regression {
   const slope = sxx === 0 ? 0 : sxy / sxx;
   const intercept = my - slope * mx;
   const r2 = sxx === 0 || syy === 0 ? 0 : (sxy * sxy) / (sxx * syy);
-  return { slope, intercept, r2, predict: (x) => intercept + slope * x };
+  let ssr = 0;
+  for (let i = 0; i < n; i++) ssr += (ys[i] - (intercept + slope * xs[i])) ** 2;
+  const sigma = n > 2 ? Math.sqrt(ssr / (n - 2)) : 0;
+  return {
+    slope,
+    intercept,
+    r2,
+    predict: (x) => intercept + slope * x,
+    standardError: (x) => (sxx === 0 ? 0 : sigma * Math.sqrt(1 / n + (x - mx) ** 2 / sxx)),
+  };
 }
 
 // ---------- okno sezonowe ----------
@@ -205,6 +216,8 @@ export interface Analysis {
     trendPerDecade: number;
     trendR2: number;
     trendUsed: boolean;
+    /** O ile lat rok docelowy wykracza poza ostatni rok danych. */
+    extrapolationYears: number;
   };
   yearly: YearPoint[];
   trendLine: YearPoint[];
@@ -258,7 +271,7 @@ function trendForecast(
         yearly.map((p) => p.year),
         yearly.map((p) => p.mean),
       )
-    : { slope: 0, intercept: 0, r2: 0, predict: () => 0 };
+    : { slope: 0, intercept: 0, r2: 0, predict: () => 0, standardError: () => 0 };
 
   // poziom bazowy: trend liniowy albo (przy zbyt krótkiej serii) średnia ważona
   let level: (year: number) => number = reg.predict;
@@ -268,12 +281,17 @@ function trendForecast(
   }
   // reszty = wartość dzienna minus poziom dla jej roku → rozrzut dzienny + międzyroczny
   const residuals = samples.map((s) => pick(s) - level(s.seasonYear));
+  const expected = level(targetYear) + weightedMean(residuals, weights);
+  // niepewność położenia trendu (rośnie przy dalekiej ekstrapolacji) dodana w kwadraturze
+  // do rozrzutu dziennego: P10/P90 rozkładu normalnego to ±1.2816σ
+  const trendSpread = 1.2816 * reg.standardError(targetYear);
+  const widen = (d: number) => Math.sign(d) * Math.sqrt(d * d + trendSpread * trendSpread);
   const base = level(targetYear);
   return {
     forecast: {
-      expected: base + weightedMean(residuals, weights),
-      p10: base + weightedQuantile(residuals, weights, 0.1),
-      p90: base + weightedQuantile(residuals, weights, 0.9),
+      expected,
+      p10: expected + widen(base + weightedQuantile(residuals, weights, 0.1) - expected),
+      p90: expected + widen(base + weightedQuantile(residuals, weights, 0.9) - expected),
     },
     reg,
     yearly,
@@ -348,6 +366,7 @@ export function analyze(records: DailyRecord[], target: Date, opts: AnalyzeOptio
       trendPerDecade: fMean.reg.slope * 10,
       trendR2: fMean.reg.r2,
       trendUsed: useTrend,
+      extrapolationYears: Math.max(0, targetYear - latest),
     },
     yearly: fMean.yearly,
     trendLine,

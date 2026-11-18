@@ -191,7 +191,11 @@ a {
 }
 
 .target {
-  margin: 12px 0;
+  margin-top: 12px;
+}
+.target-hint {
+  margin: 6px 0 12px;
+  font-size: 0.85rem;
   color: var(--text-secondary);
 }
 

@@ -13,7 +13,8 @@ const form = $<HTMLFormElement>('form');
 const dateInput = $<HTMLInputElement>('date');
 const yearsInput = $<HTMLInputElement>('years');
 const aheadInput = $<HTMLInputElement>('ahead');
-const targetOut = $('target-date');
+const targetInput = $<HTMLInputElement>('target');
+const targetHint = $('target-hint');
 const locationOut = $('location');
 const submit = $<HTMLButtonElement>('submit');
 const search = $<HTMLInputElement>('search');
@@ -26,17 +27,45 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 
 dateInput.value = isoDate(new Date());
 
+const DAY_MS = 86_400_000;
+const parseIso = (v: string) => new Date(`${v}T00:00:00Z`);
+
 function targetDate(): Date | null {
-  if (!dateInput.value) return null;
-  const d = new Date(`${dateInput.value}T00:00:00Z`);
-  const m = Number(aheadInput.value) || 0;
-  d.setUTCDate(d.getUTCDate() + m);
-  return d;
+  return targetInput.value ? parseIso(targetInput.value) : null;
 }
 
-function updateTarget() {
+function updateHint() {
   const d = targetDate();
-  targetOut.textContent = d ? fmtDate.format(d) : '—';
+  if (!d) {
+    targetHint.textContent = '';
+    return;
+  }
+  const yearsAhead = (d.getTime() - Date.now()) / (365.25 * DAY_MS);
+  targetHint.textContent =
+    `${fmtDate.format(d)}` +
+    (yearsAhead > 1 ? ` · ok. ${yearsAhead.toFixed(1)} lat w przód – przedział niepewności rośnie z odległością` : '');
+}
+
+/** Odniesienie + M → data docelowa. */
+function syncTargetFromAhead() {
+  if (!dateInput.value) return;
+  const d = parseIso(dateInput.value);
+  d.setUTCDate(d.getUTCDate() + Math.max(0, Math.round(Number(aheadInput.value) || 0)));
+  targetInput.value = isoDate(d);
+  updateHint();
+}
+
+/** Data docelowa → M (gdy cel jest przed odniesieniem, odniesienie przesuwa się na cel). */
+function syncAheadFromTarget() {
+  const d = targetDate();
+  if (!d || !dateInput.value) return updateHint();
+  let ref = parseIso(dateInput.value);
+  if (d < ref) {
+    dateInput.value = targetInput.value;
+    ref = d;
+  }
+  aheadInput.value = String(Math.round((d.getTime() - ref.getTime()) / DAY_MS));
+  updateHint();
 }
 
 function updateLocation() {
@@ -50,8 +79,9 @@ const map = createMap($('map'), state, (lat, lon) => {
   updateLocation();
 });
 
-[dateInput, aheadInput].forEach((el) => el.addEventListener('input', updateTarget));
-updateTarget();
+[dateInput, aheadInput].forEach((el) => el.addEventListener('input', syncTargetFromAhead));
+targetInput.addEventListener('input', syncAheadFromTarget);
+syncTargetFromAhead();
 updateLocation();
 
 // ---------- wyszukiwarka miejsc ----------
@@ -126,6 +156,7 @@ function render(a: Analysis, years: number, ahead: number) {
     `${a.sampleSize} dni z ${a.years.length} lat (${a.years[0]}–${a.years[a.years.length - 1]}), ` +
     `okno ±7 dni wokół ${fmtDay.format(a.target)}` +
     (ahead ? ` · ${ahead} dni od daty odniesienia` : '') +
+    (a.forecast.extrapolationYears > 0 ? ` · ekstrapolacja ${a.forecast.extrapolationYears} lat poza dane` : '') +
     (a.years.length < years ? ` · dostępne ${a.years.length} z ${years} lat` : '');
 
   const f = a.forecast;
@@ -186,6 +217,10 @@ form.addEventListener('submit', async (e) => {
   const target = targetDate();
   const years = Math.min(50, Math.max(1, Math.round(Number(yearsInput.value) || 30)));
   const ahead = Math.max(0, Math.round(Number(aheadInput.value) || 0));
+  if (target && target.getUTCFullYear() > 2100) {
+    showStatus('Maksymalna data docelowa to 31.12.2100.', true);
+    return;
+  }
   if (!target) return;
 
   submit.disabled = true;

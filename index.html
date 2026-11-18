@@ -35,10 +35,14 @@
             </label>
             <label class="field">
               <span>M – dni w przód</span>
-              <input id="ahead" type="number" min="0" max="365" value="7" required />
+              <input id="ahead" type="number" min="0" max="36500" value="7" required />
             </label>
           </div>
-          <p class="target">Data docelowa: <strong id="target-date">—</strong></p>
+          <label class="field target">
+            <span>Data docelowa (= odniesienie + M dni) — możesz wpisać dowolną, np. 30.09.2030</span>
+            <input id="target" type="date" max="2100-12-31" required />
+          </label>
+          <p class="target-hint" id="target-hint"></p>
           <button id="submit" type="submit">Analizuj</button>
         </form>
       </section>

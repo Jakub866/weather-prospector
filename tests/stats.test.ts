@@ -122,3 +122,27 @@ describe('kody WMO', () => {
     expect(categorize(95)).toBe('storm');
   });
 });
+
+describe('daleka przyszłość', () => {
+  const recs = series('1995-01-01', '2024-12-31', (d) => {
+    const y = d.getUTCFullYear() - 1995;
+    // trend + losowy szum międzyroczny (deterministyczny)
+    const base = 0.3 * y + Math.sin(y * 12.9898) * 1.5 + Math.sin(d.getUTCDate()) * 2;
+    return { tMean: base, tMax: base + 5, tMin: base - 5 };
+  });
+
+  it('analizuje datę kilka lat do przodu (30.09.2030)', () => {
+    const a = analyze(recs, new Date('2030-09-30T00:00:00Z'));
+    expect(a.forecast.extrapolationYears).toBe(6);
+    expect(a.forecast.tMean.expected).toBeGreaterThan(9);
+    expect(a.trendLine[1].year).toBe(2030);
+  });
+
+  it('przedział niepewności rośnie z odległością ekstrapolacji', () => {
+    const near = analyze(recs, new Date('2025-09-30T00:00:00Z')).forecast.tMean;
+    const far = analyze(recs, new Date('2060-09-30T00:00:00Z')).forecast.tMean;
+    expect(far.p90 - far.p10).toBeGreaterThan(near.p90 - near.p10);
+    expect(far.p10).toBeLessThan(far.expected);
+    expect(far.p90).toBeGreaterThan(far.expected);
+  });
+});
